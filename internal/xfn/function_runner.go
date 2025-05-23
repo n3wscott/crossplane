@@ -19,6 +19,7 @@ package xfn
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"sync"
 	"time"
 
@@ -142,7 +143,7 @@ func NewPackagedFunctionRunner(c client.Reader, o ...PackagedFunctionRunnerOptio
 // RunFunction sends the supplied RunFunctionRequest to the named Function. The
 // function is expected to be an installed Function.pkg.crossplane.io package.
 func (r *PackagedFunctionRunner) RunFunction(ctx context.Context, name string, req *fnv1.RunFunctionRequest) (*fnv1.RunFunctionResponse, error) {
-	conn, err := r.getClientConn(ctx, name)
+	conn, err := r.getClientConn(ctx, fmt.Sprintf("fn#%s", name))
 	if err != nil {
 		return nil, errors.Wrapf(err, errFmtGetClientConn, name)
 	}
@@ -153,7 +154,7 @@ func (r *PackagedFunctionRunner) RunFunction(ctx context.Context, name string, r
 
 // In most cases our gRPC target will be a Kubernetes Service. The package
 // manager creates this service for each active FunctionRevision, but the
-// Service is aligned with the Function. It's name is derived from the Function
+// Service is aligned with the Function. Its name is derived from the Function
 // (not the FunctionRevision). This means the target won't change just because a
 // new FunctionRevision was created.
 //
@@ -293,7 +294,14 @@ func (r *PackagedFunctionRunner) GarbageCollectConnectionsNow(ctx context.Contex
 
 	functionExists := map[string]bool{}
 	for _, f := range l.Items {
-		functionExists[f.GetName()] = true
+		key := f.GetName()
+		switch f.Status.Type {
+		case "", pkgv1.FunctionTypeComposition:
+			key = fmt.Sprintf("fn#%s", key)
+		case pkgv1.FunctionTypeOperation:
+			key = fmt.Sprintf("op#%s", key)
+		}
+		functionExists[key] = true
 	}
 
 	// Garbage collect connections.
