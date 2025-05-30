@@ -80,6 +80,7 @@ func (c *initCommand) Run(s *runtime.Scheme, log logging.Logger) error {
 			"compositions.apiextensions.crossplane.io",
 		),
 	)
+
 	if c.WebhookEnabled {
 		nn := types.NamespacedName{
 			Name:      c.TLSServerSecretName,
