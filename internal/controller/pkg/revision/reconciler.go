@@ -452,6 +452,8 @@ func SetupFunctionRevision(mgr ctrl.Manager, o controller.Options) error {
 		if o.Features.Enabled(features.EnableBetaDeploymentRuntimeConfigs) {
 			cb = cb.Watches(&v1beta1.DeploymentRuntimeConfig{}, EnqueuePackageRevisionsForRuntimeConfig(mgr.GetClient(), &v1.FunctionRevisionList{}, log))
 		}
+	} else if o.PackageRuntime == controller.PackageRuntimeExternal {
+		ro = append(ro, WithRuntimeHooks(NewExternalFunctionHooks(mgr.GetClient())))
 	}
 
 	return cb.WithOptions(o.ForControllerRuntime()).

@@ -115,6 +115,8 @@ func (h *ProviderHooks) Pre(ctx context.Context, pkg runtime.Object, pr v1.Packa
 		return errors.Wrap(err, errApplyProviderService)
 	}
 
+	// TODO: We still need the runtime provider to build secretes for us.
+
 	secClient := build.TLSClientSecret()
 	secServer := build.TLSServerSecret()
 
