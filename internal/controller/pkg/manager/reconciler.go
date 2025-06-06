@@ -437,7 +437,38 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 			// all non-current revisions are inactive.
 			continue
 		}
+		// TODO: This seems like a bug with manual mode activation policy. It means that you can never use an older revision.
 		if rev.GetDesiredState() == v1.PackageRevisionActive {
+			// The current revision is not the active revision so we should check its health and move on.
+
+			// ---------------- trying this.
+
+			if p.GetActivationPolicy() == nil || *p.GetActivationPolicy() == v1.ManualActivation {
+				prHealthy := pr.GetCondition(v1.TypeHealthy)
+				switch prHealthy.Status {
+				case corev1.ConditionTrue:
+					if p.GetCondition(v1.TypeHealthy).Status != corev1.ConditionTrue {
+						// NOTE(phisco): We don't want to spam the user with events if the
+						// package is already healthy.
+						r.record.Event(p, event.Normal(reasonInstall, "Successfully installed package revision"))
+					}
+					status.MarkConditions(v1.Healthy())
+				case corev1.ConditionFalse:
+					status.MarkConditions(v1.Unhealthy().WithMessage(prHealthy.Message))
+					r.record.Event(p, event.Warning(reasonInstall, errors.New(errUnhealthyPackageRevision)))
+				case corev1.ConditionUnknown:
+					status.MarkConditions(v1.UnknownHealth().WithMessage(prHealthy.Message))
+					r.record.Event(p, event.Warning(reasonInstall, errors.New(errUnknownPackageRevisionHealth)))
+				}
+				status.MarkConditions(v1.Active())
+
+				// TODO on GC events.
+				return pullBasedRequeue(p.GetPackagePullPolicy()), errors.Wrap(r.client.Status().Update(ctx, p), errUpdateStatus)
+			}
+
+			// ----------------
+
+			// TODO: this comment is incorrect.
 			// If revision is not the current revision, set to
 			// inactive. This should always be done, regardless of
 			// the package's revision activation policy.
@@ -471,20 +502,19 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 		}
 	}
 
-	// TODO(phisco): refactor these conditions to make it clearer
-	if pr.GetCondition(v1.TypeHealthy).Status == corev1.ConditionTrue {
+	prHealthy := pr.GetCondition(v1.TypeHealthy)
+	switch prHealthy.Status {
+	case corev1.ConditionTrue:
 		if p.GetCondition(v1.TypeHealthy).Status != corev1.ConditionTrue {
 			// NOTE(phisco): We don't want to spam the user with events if the
 			// package is already healthy.
 			r.record.Event(p, event.Normal(reasonInstall, "Successfully installed package revision"))
 		}
 		status.MarkConditions(v1.Healthy())
-	}
-	if prHealthy := pr.GetCondition(v1.TypeHealthy); prHealthy.Status == corev1.ConditionFalse {
+	case corev1.ConditionFalse:
 		status.MarkConditions(v1.Unhealthy().WithMessage(prHealthy.Message))
 		r.record.Event(p, event.Warning(reasonInstall, errors.New(errUnhealthyPackageRevision)))
-	}
-	if prHealthy := pr.GetCondition(v1.TypeHealthy); prHealthy.Status == corev1.ConditionUnknown {
+	case corev1.ConditionUnknown:
 		status.MarkConditions(v1.UnknownHealth().WithMessage(prHealthy.Message))
 		r.record.Event(p, event.Warning(reasonInstall, errors.New(errUnknownPackageRevisionHealth)))
 	}
