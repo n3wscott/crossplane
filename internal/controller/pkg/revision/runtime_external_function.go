@@ -77,6 +77,7 @@ func (h *ExternalFunctionHooks) Pre(ctx context.Context, pkg runtime.Object, pr 
 	}
 
 	var dnsNames []string
+	dnsNames = append(dnsNames, functionMeta.Name) // TODO: there is a race condition here where the cert is needed to make the knatvie service but we can't make the cert until we know what the url will be for the knative service.
 	for _, rev := range revs.Items {
 		if rev.Status.Endpoint == "" {
 			continue

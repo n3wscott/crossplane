@@ -453,6 +453,7 @@ func SetupFunctionRevision(mgr ctrl.Manager, o controller.Options) error {
 			cb = cb.Watches(&v1beta1.DeploymentRuntimeConfig{}, EnqueuePackageRevisionsForRuntimeConfig(mgr.GetClient(), &v1.FunctionRevisionList{}, log))
 		}
 	} else if o.PackageRuntime == controller.PackageRuntimeExternal {
+		log.Info("Runtime is External")
 		ro = append(ro, WithRuntimeHooks(NewExternalFunctionHooks(mgr.GetClient())))
 	}
 

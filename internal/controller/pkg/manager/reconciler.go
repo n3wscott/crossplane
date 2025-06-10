@@ -408,6 +408,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 	// the original until it's time to actually pull an image.
 	p.SetCurrentIdentifier(p.GetSource())
 
+	// -- Ok here we need to make the new revision.
+
 	pr := r.newPackageRevision()
 	maxRevision := int64(0)
 	oldestRevision := int64(math.MaxInt64)
@@ -463,23 +465,25 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 				status.MarkConditions(v1.Active())
 
 				// TODO on GC events.
-				return pullBasedRequeue(p.GetPackagePullPolicy()), errors.Wrap(r.client.Status().Update(ctx, p), errUpdateStatus)
-			}
+				// TODO: because this exists reconciliation, there is a bug where new revisions do not get created if there is an active revision.
+				//return pullBasedRequeue(p.GetPackagePullPolicy()), errors.Wrap(r.client.Status().Update(ctx, p), errUpdateStatus)
+			} else {
 
-			// ----------------
+				// ----------------
 
-			// TODO: this comment is incorrect.
-			// If revision is not the current revision, set to
-			// inactive. This should always be done, regardless of
-			// the package's revision activation policy.
-			rev.SetDesiredState(v1.PackageRevisionInactive)
-			if err := r.client.Apply(ctx, rev, resource.MustBeControllableBy(p.GetUID())); err != nil {
-				if kerrors.IsConflict(err) {
-					return reconcile.Result{Requeue: true}, nil
+				// TODO: this comment is incorrect.
+				// If revision is not the current revision, set to
+				// inactive. This should always be done, regardless of
+				// the package's revision activation policy.
+				rev.SetDesiredState(v1.PackageRevisionInactive)
+				if err := r.client.Apply(ctx, rev, resource.MustBeControllableBy(p.GetUID())); err != nil {
+					if kerrors.IsConflict(err) {
+						return reconcile.Result{Requeue: true}, nil
+					}
+					err = errors.Wrap(err, errUpdateInactivePackageRevision)
+					r.record.Event(p, event.Warning(reasonTransitionRevision, err))
+					return reconcile.Result{}, err
 				}
-				err = errors.Wrap(err, errUpdateInactivePackageRevision)
-				r.record.Event(p, event.Warning(reasonTransitionRevision, err))
-				return reconcile.Result{}, err
 			}
 		}
 	}
