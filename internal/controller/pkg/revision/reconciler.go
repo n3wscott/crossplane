@@ -1000,11 +1000,14 @@ func (r *Reconciler) runtimeManifestBuilderOptions(ctx context.Context, pwr v1.P
 			return nil, errors.New(errNoRuntimeConfig)
 		}
 
-		rc := &v1beta1.DeploymentRuntimeConfig{}
-		if err := r.client.Get(ctx, types.NamespacedName{Name: rcRef.Name}, rc); err != nil {
-			return nil, errors.Wrap(err, errGetRuntimeConfig)
+		// TODO: think about how to really fix this, this will NPE if rcRef is nil or have nil values.
+		if *rcRef.Kind == v1beta1.DeploymentRuntimeConfigKind && *rcRef.APIVersion == v1beta1.SchemeGroupVersion.String() {
+			rc := &v1beta1.DeploymentRuntimeConfig{}
+			if err := r.client.Get(ctx, types.NamespacedName{Name: rcRef.Name}, rc); err != nil {
+				return nil, errors.Wrap(err, errGetRuntimeConfig)
+			}
+			opts = append(opts, RuntimeManifestBuilderWithRuntimeConfig(rc))
 		}
-		opts = append(opts, RuntimeManifestBuilderWithRuntimeConfig(rc))
 	}
 
 	sa := &corev1.ServiceAccount{}
