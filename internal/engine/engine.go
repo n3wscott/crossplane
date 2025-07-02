@@ -271,6 +271,8 @@ func (e *ControllerEngine) Start(name string, o ...ControllerOption) error {
 		sources: make(map[WatchID]*StoppableSource),
 	}
 
+	// TODO: there is a race condition here between adding a new controller if we have already added it. We could leak a
+	//       go routine between here and line 206.
 	e.controllers[name] = r
 
 	return nil
