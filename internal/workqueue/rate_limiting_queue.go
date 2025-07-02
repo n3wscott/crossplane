@@ -16,7 +16,9 @@ limitations under the License.
 
 package workqueue
 
-import "k8s.io/utils/clock"
+import (
+	"k8s.io/utils/clock"
+)
 
 // RateLimitingInterface is an interface that rate limits items being added to the queue.
 //
@@ -135,6 +137,10 @@ type rateLimitingType[T comparable] struct {
 
 // AddRateLimited AddAfter's the item based on the time when the rate limiter says it's ok
 func (q *rateLimitingType[T]) AddRateLimited(item T) {
+	if q.Has(item) {
+		//fmt.Println("Skipping!")
+		return
+	}
 	q.TypedDelayingInterface.AddAfter(item, q.rateLimiter.When(item))
 }
 

@@ -30,6 +30,7 @@ type TypedInterface[T comparable] interface {
 	Add(item T)
 	Len() int
 	Get() (item T, shutdown bool)
+	Has(item T) bool
 	Done(item T)
 	ShutDown()
 	ShutDownWithDrain()
@@ -94,7 +95,7 @@ type TypedQueueConfig[T comparable] struct {
 	Clock clock.WithTicker
 
 	// Queue provides the underlying queue to use. It is optional and defaults to slice based FIFO queue.
-	Queue Queue[T]
+	Queue FairQueue[T]
 }
 
 // New constructs a new work queue (see the package comment).
@@ -152,7 +153,7 @@ func newQueueWithConfig[T comparable](config TypedQueueConfig[T], updatePeriod t
 	}
 
 	if config.Queue == nil {
-		config.Queue = DefaultQueue[T]()
+		config.Queue = DefaultFairQueue[T]()
 	}
 
 	return newQueue(
@@ -163,7 +164,7 @@ func newQueueWithConfig[T comparable](config TypedQueueConfig[T], updatePeriod t
 	)
 }
 
-func newQueue[T comparable](c clock.WithTicker, queue Queue[T], metrics queueMetrics, updatePeriod time.Duration) *Typed[T] {
+func newQueue[T comparable](c clock.WithTicker, queue FairQueue[T], metrics queueMetrics, updatePeriod time.Duration) *Typed[T] {
 	t := &Typed[T]{
 		clock:                      c,
 		queue:                      queue,
@@ -193,7 +194,7 @@ type Typed[t comparable] struct {
 	// queue defines the order in which we will work on items. Every
 	// element of queue should be in the dirty set and not in the
 	// processing set.
-	queue Queue[t]
+	queue FairQueue[t]
 
 	// dirty defines all of the items that need to be processed.
 	dirty set[t]
@@ -234,6 +235,25 @@ func (s set[t]) delete(item t) {
 
 func (s set[t]) len() int {
 	return len(s)
+}
+
+func (q *Typed[T]) Has(item T) bool {
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+
+	//fmt.Println("Processing", q.processing.has(item), "Dirty", q.dirty.has(item), "Queue", q.queue.Contains(item))
+
+	if q.processing.has(item) {
+		// If it is processing, but it is not dirty, then we don't have it and the caller should add it again.
+		if q.dirty.has(item) {
+			return true
+		}
+		return false
+	}
+	if q.queue.Contains(item) {
+		return true
+	}
+	return false
 }
 
 // Add marks item as needing processing.

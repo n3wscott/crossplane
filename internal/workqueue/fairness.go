@@ -1,7 +1,6 @@
 package workqueue
 
 import (
-	"golang.org/x/time/rate"
 	"time"
 )
 
@@ -48,23 +47,3 @@ type TODO[T comparable] interface {
 // - The global rate limiter
 // - The local rate limiter
 // - The error backoff limiter.
-
-// FairBucketRateLimiter adapts a standard bucket to the workqueue ratelimiter API
-type FairBucketRateLimiter[T comparable] struct {
-	*rate.Limiter
-}
-
-func (r *FairBucketRateLimiter[T]) Next(item T) time.Duration {
-	return r.Limiter.Reserve().Delay()
-}
-
-func (r *FairBucketRateLimiter[T]) When(item T) time.Duration {
-	return r.Limiter.Reserve().Delay()
-}
-
-func (r *FairBucketRateLimiter[T]) NumRequeues(item T) int {
-	return 0
-}
-
-func (r *FairBucketRateLimiter[T]) Forget(item T) {
-}

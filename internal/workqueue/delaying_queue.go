@@ -162,6 +162,8 @@ type delayingType[T comparable] struct {
 
 	// metrics counts the number of retries
 	metrics retryMetrics
+
+	hasFn func(item T) bool
 }
 
 // waitFor holds the data to add and the time it should be added
@@ -251,6 +253,13 @@ func (q *delayingType[T]) AddAfter(item T, duration time.Duration) {
 	}
 }
 
+func (q *delayingType[T]) Has(item T) bool {
+	if q.hasFn != nil {
+		return q.hasFn(item)
+	}
+	return q.TypedInterface.Has(item)
+}
+
 // maxWait keeps a max bound on the wait time. It's just insurance against weird things happening.
 // Checking the queue every 10 seconds isn't expensive and we know that we'll never end up with an
 // expired item sitting for more than 10 seconds.
@@ -270,6 +279,14 @@ func (q *delayingType[T]) waitingLoop() {
 	heap.Init(waitingForQueue)
 
 	waitingEntryByData := map[t]*waitFor{}
+
+	q.hasFn = func(item T) bool {
+		if waitingEntryByData[item] != nil {
+			return true
+		}
+		// TODO: might miss some things here.
+		return q.TypedInterface.Has(item)
+	}
 
 	for {
 		if q.TypedInterface.ShuttingDown() {

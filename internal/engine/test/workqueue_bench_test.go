@@ -18,6 +18,7 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -147,15 +148,17 @@ func (h *WorkQueueBenchHarness) timeAdvancer() {
 	timeAdvance := time.Duration(h.config.TimeAdvanceUS) * time.Microsecond
 	totalSteps := int(testDuration / timeAdvance)
 
+	fmt.Println("START -->", h.clock.Now())
 	for i := 0; i < totalSteps; i++ {
 		select {
 		case <-h.ctx.Done():
 			return
 		default:
 			h.clock.Step(timeAdvance)
-			time.Sleep(time.Microsecond) // Give goroutines time to process
+			time.Sleep(time.Nanosecond) // Give goroutines time to process
 		}
 	}
+	fmt.Println("STOP -->", h.clock.Now())
 	h.Stop()
 }
 
@@ -222,6 +225,8 @@ func (h *WorkQueueBenchHarness) consumer(id int) {
 			if consumerDelay > 0 {
 				<-h.clock.After(consumerDelay)
 			}
+			time.Sleep(time.Nanosecond)
+			//fmt.Println("Done at -->", h.clock.Now())
 
 			h.workQueue.Done(item)
 			h.workQueue.Forget(item) // TODO: we could choose to do this every 10 or something to make it more interesting.
@@ -329,9 +334,9 @@ func TestWorkQueueBench(t *testing.T) {
 		"RateLimitedProducer": {
 			config: WorkQueueBenchConfig{
 				TestDurationMS:      3000,
-				ProducerFrequencyMS: 0,    // As fast as possible
-				ConsumerDelayMS:     1,    // Fast consumer
-				RateLimitQPS:        10.0, // Rate limited
+				ProducerFrequencyMS: 0,     // As fast as possible
+				ConsumerDelayMS:     1,     // Fast consumer
+				RateLimitQPS:        100.0, // Rate limited
 				RateLimitBurst:      5,
 				TimeAdvanceUS:       1,
 				ProducerCount:       1,
